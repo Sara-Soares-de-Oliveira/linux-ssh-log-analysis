@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# ignore raw dataset
+data/Linux_2k.log
