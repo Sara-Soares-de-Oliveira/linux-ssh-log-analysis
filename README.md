@@ -1,4 +1,4 @@
-# Linux SSH Log Analysis (SOC Project)
+# Linux SSH Log Analysis 
 
 This project simulates a **analysis of Linux SSH authentication logs**.
 
