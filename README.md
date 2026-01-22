@@ -45,6 +45,7 @@ Detailed reasoning and methodology can be found in:
 
 ### Notes
 •	This project is intentionally iterative.
+
 •	Parsing logic and analysis will evolve as skills improve.
 
 ---
