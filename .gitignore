@@ -1,6 +1,18 @@
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# macOS
 .DS_Store
 
-# ignore raw dataset
+# Virtual environments
+venv/
+.env/
+
+# Raw datasets
 data/Linux_2k.log
+
+# VS Code
+.vscode/

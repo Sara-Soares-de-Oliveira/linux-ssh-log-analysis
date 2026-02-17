@@ -19,15 +19,14 @@ The main goal of this project is to simulate a **Analysis of SSH authentication 
 
 ---
 
-## Initial Log Analysis and Scope Definition
-After manually inspecting the original log file, I defined a **primary scope** focused exclusively on:
+## Scope Definition
 
-- SSH-related events
-- Authentication attempts (successful or failed)
+After manually inspecting the original log file, I defined a primary analytical scope:
 
-All other system events were considered noise for the purpose of this project.
+- Include only SSH authentication-related events
+- Exclude unrelated system noise (kernel, services, initialization logs)
 
-This step was essential to reduce complexity and work with a dataset that reflects a realistic investigation scenario.
+This decision reduces complexity and reflects how a SOC analyst would narrow investigation scope during log triage.
 
 ---
 
@@ -73,11 +72,11 @@ grep -E 'sshd|authentication|Failed|Accepted|invalid user|rhost|user=' Linux_2k.
 
 As a result, the dataset was reduced from 1999 lines to 701 lines, making it significantly more manageable and focused
 
-### Field Extraction Strategy
+## Field Extraction Strategy
 
 Tooling Decision
 
-Initially, the plan was to use awk + regex, but this approach proved too complex and hard to maintain for multiple log formats.
+Initially, the plan was to use awk + regex. However, due to the variability of log formats and maintainability concerns, the approach was changed to:
 
 Therefore, I decided to use:
 	•	Python
@@ -90,18 +89,15 @@ This choice allowed for:
 
 ### Extraction Logic
 
-The extraction process follows this logic:
-	1.	Read the filtered log file line by line
-	2.	Attempt to extract:
-	•	timestamp
-	•	remote host (rhost)
-	•	username (user=… or user <name>)
-	3.	Store each log entry as a dictionary
-	4.	Append each dictionary to a list (one event per log line)
+For each log line:
+	1.	Extract timestamp (syslog format)
+	2.	Extract remote host (rhost)
+	3.	Extract username (supports both user=<name> and user <name>)
+	4.	Preserve original log line for traceability
 
-Some authentication-related lines do not contain an IP address. These lines were intentionally preserved to maintain data completeness.
+Each event is stored as a dictionary and exported to a structured CSV file.
 
-The extraction process was implemented using re.search() and capture groups.
+Some authentication lines do not contain an IP address. These were intentionally preserved to maintain completeness of authentication activity.
 
 ## Data Structuring
 
@@ -113,33 +109,65 @@ Each log entry is stored with the following fields:
 
 All entries are then exported into a structured CSV file (log_data.csv) using Python’s csv.DictWriter.
 
-## Scripts Overview
-•	analyzer.py
-    Responsible for:
-	•	reading the filtered log file
-	•	extracting relevant fields
-	•	building dictionaries
-	•	exporting the structured CSV
+### Temporal Enrichment
 
-•	analysis.py
-    Reserved for data analysis tasks, such as:
-	•	top attacking hosts
-	•	most targeted users
-	•	temporal analysis (in progress)
+Because syslog timestamps do not include a year, an assumed year is added during preprocessing.
+
+Derived time features include:
+	•	complete_time (full datetime object)
+	•	hour (for hourly distribution analysis)
+	•	floor_minutes (minute-level aggregation for brute-force detection)
+
+## Brute-Force Detection
+Detection is based on behavioral aggregation.
+
+Detection Rule
+
+A source host generating ≥ 5 authentication attempts within a single minute
+is flagged as suspicious.
+
+Rationale
+	•	Human users rarely generate multiple login attempts within such short intervals.
+	•	Automated scripts and brute-force tools typically produce burst patterns.
+	•	Minute-level bucketing allows identification of high-frequency attack behavior.
+
+Limitations
+	•	Low-and-slow attacks may not trigger this threshold.
+	•	The dataset does not consistently differentiate between success and failure.
+	•	Threshold is heuristic and not baseline-calibrated.
+
+
+### Behavioral Indicators Considered
+	•	Repeated authentication attempts from the same source host
+	•	High concentration of attempts within short time windows
+	•	Repeated targeting of common usernames (e.g., root, test)
+	•	Temporal clustering suggesting automation
+
+
+## Visual Analysis
+
+Three primary visualizations were generated:
+	1.	Top source hosts by authentication attempts
+	2.	Authentication attempts per hour
+	3.	Brute-force intensity (maximum attempts per minute per host)
+
+These visuals support behavioral interpretation rather than raw counting.
 	
 ## Current Status
 
 At this stage, the project includes:
-	•	a filtered and scoped dataset
-	•	a structured CSV ready for analysis
-	•	initial exploratory analysis (basic prints)
-
-Further analysis (temporal patterns, brute-force detection, and visualization) will be added as the project evolves.
+	•	Filtered dataset
+	•	Structured CSV extraction
+	•	Modular architecture (parser, utilities, analysis, visualization)
+	•	Brute-force detection logic
+	•	Exported detection results
+	•	Generated visual reports
 
 ## Future Improvements
-	•	Correlate authentication failures with timestamps to detect brute-force behavior
-	•	Add hourly and daily aggregation
-	•	Visualize attack patterns
-	•	Improve parsing logic as regex skills evolve
+	•	Separate successful vs failed authentication explicitly
+	•	Implement longer-window detection for low-and-slow attacks
+	•	Integrate geolocation or IP reputation enrichment
+	•	Translate detection logic into SIEM query format (e.g., Splunk/ELK)
+	•	Develop automated reporting output
 
 This project is intentionally iterative and will be refined as my knowledge grows.	
